@@ -1,0 +1,12 @@
+MCtruth	          0
+etaElectronAcc    1
+ptElectronAcc     1
+nRecoEle          1
+electronID        1
+trackerIsolHard   1
+trackerIsolSlow   1
+ecalIsolHardEB    1
+ecalIsolSlowEB    1
+ecalIsolHardEE    1
+ecalIsolSlowEE    1
+invMass           1

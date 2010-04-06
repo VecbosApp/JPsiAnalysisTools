@@ -1,0 +1,9 @@
+etaElectronAcc		-2.5		2.5	
+ptElectronAcc		 2.0		10000.	
+trackerIsolHard          -999           3.0
+trackerIsolSlow          -999           3.0
+ecalIsolHardEB           -999           8.0
+ecalIsolSlowEB           -999           4.0
+ecalIsolHardEE           -999           9.0
+ecalIsolSlowEE           -999           7.0
+invMass                  0.0            4.0
