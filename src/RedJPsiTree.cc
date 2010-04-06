@@ -21,6 +21,7 @@ RedJPsiTree::RedJPsiTree(const char * filename) {
   myTree->Branch("event", &myEvent, "event/I");
   myTree->Branch("invMass",        &myInvMass,        "invMass/F");  
   myTree->Branch("trackerInvMass", &myTrackerInvMass, "trackerInvMass/F");  
+  myTree->Branch("gsfTrackInvMass",  &myGsfTrackInvMass,  "gsfTrackInvMass/F");
   myTree->Branch("deltaR",         &myDeltaR,         "deltaR/F");  
   myTree->Branch("pt1", &mypt1, "pt1/F");
   myTree->Branch("pt2", &mypt2, "pt2/F");
@@ -50,10 +51,11 @@ void RedJPsiTree::save() {
 }
 
 
-void RedJPsiTree::fillAll(float im, float tim, float dr, float pt1, float pt2, float eta1, float eta2, int rf1, int rf2) {
+void RedJPsiTree::fillAll(float im, float tim, float gsftim, float dr, float pt1, float pt2, float eta1, float eta2, int rf1, int rf2) {
 
   myInvMass        = im;
   myTrackerInvMass = tim;
+  myGsfTrackInvMass  = gsftim;
   myDeltaR         = dr;
   mypt1 = pt1;
   mypt2 = pt2;

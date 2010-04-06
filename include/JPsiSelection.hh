@@ -30,6 +30,7 @@ private:
 
   //! for MC
   bool findMcTree();
+  bool bkgMc();
   //! electrons in eta and pt acceptance
   void getElectronsInEta();
   void getElectronsInPt();
@@ -65,7 +66,7 @@ private:
   TLorentzVector *m_p4ElectronPlus;
   TLorentzVector *m_p4ElectronMinus;
   int theElectron,  thePositron;
-  float invariantMass, invariantMassTracker;
+  float invariantMass, invariantMassTracker, invariantMassGsfTracker;
   float deltaR;
 
   //! to evaluate eleID

@@ -1,7 +1,7 @@
 MCtruth	          0
+MCBackground      1
 etaElectronAcc    1
 ptElectronAcc     1
-nRecoEle          1
 electronID        1
 trackerIsolHard   1
 trackerIsolSlow   1

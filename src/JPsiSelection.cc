@@ -25,9 +25,10 @@ JPsiSelection::JPsiSelection(TTree *tree)
   _selection = new Selection(fileCuts,fileSwitches);  
   
   _selection->addSwitch("MCtruth");
+  _selection->addSwitch("MCBackground");
+  _selection->addSwitch("electronID");
   _selection->addCut("etaElectronAcc");
   _selection->addCut("ptElectronAcc");
-  _selection->addSwitch("electronID");
   _selection->addCut("trackerIsolHard");
   _selection->addCut("trackerIsolSlow");
   _selection->addCut("ecalIsolHardEB");
@@ -42,6 +43,7 @@ JPsiSelection::JPsiSelection(TTree *tree)
   counter->SetTitle("EVENT COUNTER");
   counter->AddVar("event");
   counter->AddVar("MCtruth");
+  counter->AddVar("MCBackground");
   counter->AddVar("atLeast2reco");
   counter->AddVar("etaElectronAcc");
   counter->AddVar("ptElectronAcc");
@@ -111,6 +113,11 @@ void JPsiSelection::Loop() {
     if(_selection->getSwitch("MCtruth") && !foundMcTree ) continue;
     counter->IncrVar("MCtruth",1.);
 
+    // exclude MC j/psi from background samples  
+    bool isMcBkg = bkgMc();
+    if (_selection->getSwitch("MCBackground") && isMcBkg ) continue;
+    counter->IncrVar("MCBackground",1.);
+
     // looking for reco electrons
     if(nEle>1) counter->IncrVar("atLeast2reco",1.); 
 
@@ -124,7 +131,7 @@ void JPsiSelection::Loop() {
     if(eleInPt.size()>1) counter->IncrVar("ptElectronAcc",1.);
     else continue;
 
-    // get the two highest Et electrons: chiara: da controllare se combinatorio e' meglio
+    // get the two highest Et electrons
     std::pair<int,int> theElectrons = getBestElectronPair();
     int tbElectron(theElectrons.second);
     int tbPositron(theElectrons.first);    
@@ -137,22 +144,6 @@ void JPsiSelection::Loop() {
 
     // kinematics 
     setKinematics();   
-
-    // tracker or ECAL driven electrons and index of supercluster
-    int eleIndexSc=-1;
-    int posIndexSc=-1;
-    bool eleTrackerDriven = false;
-    bool posTrackerDriven = false;
-    if(theElectron>-1) { 
-      eleTrackerDriven = anaUtilsGlobal.electronRecoType(recoFlagsEle[theElectron], isTrackerDriven); 
-      if (eleTrackerDriven)  eleIndexSc = PFsuperClusterIndexEle[theElectron];
-      if (!eleTrackerDriven) eleIndexSc = superClusterIndexEle[theElectron];
-    }
-    if(thePositron>-1) { 
-      posTrackerDriven = anaUtilsGlobal.electronRecoType(recoFlagsEle[thePositron], isTrackerDriven); 
-      if (posTrackerDriven)  posIndexSc = PFsuperClusterIndexEle[thePositron];
-      if (!posTrackerDriven) posIndexSc = superClusterIndexEle[thePositron];
-    }
 
     int theHard, theSlow;
     float pt1, pt2, eta1, eta2;
@@ -208,37 +199,14 @@ void JPsiSelection::Loop() {
     if ( _selection->getSwitch("ecalIsolSlow") && !theSlowEcalIsol ) continue;
     counter->IncrVar("ecalIsolSlow");
     
-    /*
-
-    // electron identification: vogliamo usare l'eleID alla San Diego? chiara
-    bool theElectronID = true;
-    bool thePositronID = true;
-    if (theElectron>-1) theElectronID = isEleID(theElectron, eleIndexSc);
-    if (thePositron>-1) thePositronID = isEleID(thePositron, posIndexSc);    
-    if(_selection->getSwitch("electronID") && !theElectronID) continue;
-    if(_selection->getSwitch("electronID") && !thePositronID) continue;
-    counter->IncrVar("electronID",1.);
-    
-    // electron isolation - chiara da studiare
-    float theEleTrackerPtSum = ( theElectron > -1 ) ? dr03TkSumPtEle[theElectron] : 0.0;
-    float thePosTrackerPtSum = ( thePositron > -1 ) ? dr03TkSumPtEle[thePositron] : 0.0;
-    float theEleEcalPtSum    = ( theElectron > -1 ) ? dr03EcalRecHitSumEtEle[theElectron] : 0.0;
-    float thePosEcalPtSum    = ( thePositron > -1 ) ? dr03EcalRecHitSumEtEle[thePositron] : 0.0;
-    float theEleHcalPtSum    = ( theElectron > -1 ) ? dr03HcalTowerSumEtEle[theElectron] : 0.0;
-    float thePosHcalPtSum    = ( thePositron > -1 ) ? dr03HcalTowerSumEtEle[thePositron] : 0.0;
-    // if(_selection->getSwitch("electronIsol") && 1) continue
-    counter->IncrVar("electronIsol",1.);
-
-    */
-   
     // invariant mass (fit region range)
-    if( _selection->getSwitch("invMass") && !_selection->passCut("invMass", invariantMassTracker) ) continue;
+    if( _selection->getSwitch("invMass") && !_selection->passCut("invMass", invariantMassGsfTracker) ) continue;
     counter->IncrVar("invMass");
 
     counter->IncrVar("final");
     
     // filling kinematics tree
-    myKineTree -> fillAll(invariantMass, invariantMassTracker, deltaR, pt1, pt2, eta1, eta2, rf1, rf2);
+    myKineTree -> fillAll(invariantMass, invariantMassTracker, invariantMassGsfTracker, deltaR, pt1, pt2, eta1, eta2, rf1, rf2);
     myKineTree -> fillRunInfo(runNumber, lumiBlock, eventNumber);
 
     // storing trees
@@ -252,10 +220,9 @@ void JPsiSelection::Loop() {
 
 bool JPsiSelection::findMcTree() {
 
-  /*  
   _theGenEle=-1;
   _theGenPos=-1;
-
+  
   int indE=999;
   int indP=999;
   
@@ -268,20 +235,22 @@ bool JPsiSelection::findMcTree() {
   if( indE<999 && indP<999 ) {
     _theGenEle = indE;
     _theGenPos = indP;
-    
-    // distributions for efficiency studies
-    // H_genEta -> Fill(etaMc[_theGenEle]);
-    // H_genEta -> Fill(etaMc[_theGenPos]);
-    // H_genPhi -> Fill(phiMc[_theGenEle]);
-    // H_genPhi -> Fill(phiMc[_theGenPos]);
-    // H_genPt  -> Fill(pMc[_theGenEle]*fabs(sin(thetaMc[_theGenEle])));
-    // H_genPt  -> Fill(pMc[_theGenPos]*fabs(sin(thetaMc[_theGenPos])));
   }
 
   return ( indE<999 && indP<999 );
-  */
-  return true;
 }
+
+bool JPsiSelection::bkgMc() {
+
+  bool isJPsi=false;
+
+  for(int imc=0;imc<nMc;imc++) {
+    if( abs(idMc[imc])==443 ) isJPsi = true;
+  }
+
+  return isJPsi;
+}
+
 
 void JPsiSelection::getElectronsInEta() {
    
@@ -336,7 +305,7 @@ std::pair<int,int> JPsiSelection::getBestElectronPair() {
 void JPsiSelection::setKinematics() {
 
   m_p4ElectronMinus -> SetXYZT(pxEle[theElectron],pyEle[theElectron],pzEle[theElectron],energyEle[theElectron]);
-  m_p4ElectronPlus  -> SetXYZT(pxEle[thePositron],pyEle[thePositron],pzEle[thePositron],energyEle[thePositron]);      
+  m_p4ElectronPlus  -> SetXYZT(pxEle[thePositron],pyEle[thePositron],pzEle[thePositron],energyEle[thePositron]); 
   invariantMass     = (*m_p4ElectronMinus + *m_p4ElectronPlus).M();
   
   int trackEle = trackIndexEle[theElectron];
@@ -345,9 +314,16 @@ void JPsiSelection::setKinematics() {
   TVector3 p3TrackPos(pxTrack[trackPos],pyTrack[trackPos],pzTrack[trackPos]);  
   TLorentzVector pTrackEle(p3TrackEle,p3TrackEle.Mag());
   TLorentzVector pTrackPos(p3TrackPos,p3TrackPos.Mag());
-
   invariantMassTracker = (pTrackEle+pTrackPos).M();
   
+  int gsfTrackEle = gsfTrackIndexEle[theElectron];
+  int gsfTrackPos = gsfTrackIndexEle[thePositron];
+  TVector3 p3GsfTrackEle(pxGsfTrack[gsfTrackEle],pyGsfTrack[gsfTrackEle],pzGsfTrack[gsfTrackEle]);
+  TVector3 p3GsfTrackPos(pxGsfTrack[gsfTrackPos],pyGsfTrack[gsfTrackPos],pzGsfTrack[gsfTrackPos]);
+  TLorentzVector pGsfTrackEle(p3GsfTrackEle,p3GsfTrackEle.Mag());
+  TLorentzVector pGsfTrackPos(p3GsfTrackPos,p3GsfTrackPos.Mag());
+  invariantMassGsfTracker = (pGsfTrackEle+pGsfTrackPos).M();
+
   deltaR = p3TrackEle.DeltaR(p3TrackPos); 
 }
 
@@ -359,6 +335,7 @@ void JPsiSelection::resetKinematics() {
   m_p4ElectronPlus  -> SetXYZT(0,0,0,0);
   invariantMass = 0;
   invariantMassTracker = 0;
+  invariantMassGsfTracker = 0;
   eleInEta.clear();
   eleInPt.clear();
   deltaR = 0.;
